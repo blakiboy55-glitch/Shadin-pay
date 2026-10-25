@@ -1,0 +1,6 @@
+{
+  "name": "ShadhinPay",
+  "description": "Complete secure mobile banking and digital wallet app for Bangladesh featuring BDT wallet, send money, cash out, recharge, merchant QR, bill payment, bank transfer, and admin controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

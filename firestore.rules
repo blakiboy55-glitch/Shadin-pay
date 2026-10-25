@@ -1,0 +1,155 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.admin == true ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"));
+    }
+
+    function isValidUser(data) {
+      return data.userId is string &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.phoneNumber is string && data.phoneNumber.size() > 5 &&
+             data.role in ['customer', 'merchant', 'agent', 'admin'] &&
+             data.status in ['active', 'restricted', 'suspended'] &&
+             data.kycStatus in ['unverified', 'pending', 'verified'] &&
+             (!('pinHash' in data) || data.pinHash is string) &&
+             (!('email' in data) || data.email is string) &&
+             (!('nidNumber' in data) || data.nidNumber is string) &&
+             (!('biometricsEnabled' in data) || data.biometricsEnabled is bool) &&
+             (!('preferredLanguage' in data) || data.preferredLanguage in ['en', 'bn']) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidWallet(data) {
+      return data.userId is string &&
+             data.walletId is string &&
+             data.balance is number && data.balance >= 0 &&
+             data.currency == "BDT" &&
+             data.dailyLimit is number &&
+             data.monthlyLimit is number &&
+             (!('pendingBalance' in data) || data.pendingBalance is number) &&
+             (!('spentToday' in data) || data.spentToday is number) &&
+             (!('spentThisMonth' in data) || data.spentThisMonth is number) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidTransaction(data) {
+      return data.transactionId is string && data.transactionId.size() > 0 &&
+             data.senderId is string && data.senderId.size() > 0 &&
+             data.recipientName is string && data.recipientName.size() > 0 &&
+             data.type in ['SEND_MONEY', 'ADD_MONEY', 'CASH_OUT', 'MOBILE_RECHARGE', 'MERCHANT_PAYMENT', 'BILL_PAY', 'BANK_TRANSFER'] &&
+             data.amount is number && data.amount > 0 &&
+             data.fee is number && data.fee >= 0 &&
+             data.totalAmount is number && data.totalAmount >= data.amount &&
+             data.status in ['SUCCESS', 'PENDING', 'FAILED', 'REVERSED'] &&
+             (!('currency' in data) || data.currency == "BDT") &&
+             (!('recipientId' in data) || data.recipientId is string) &&
+             (!('recipientPhone' in data) || data.recipientPhone is string) &&
+             (!('senderName' in data) || data.senderName is string) &&
+             (!('senderPhone' in data) || data.senderPhone is string) &&
+             (!('reference' in data) || data.reference is string) &&
+             (!('metadata' in data) || data.metadata is string) &&
+             (!('idempotencyKey' in data) || data.idempotencyKey is string) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    function isValidBeneficiary(data) {
+      return data.beneficiaryId is string &&
+             data.userId is string &&
+             data.name is string && data.name.size() > 0 &&
+             data.phoneOrAccount is string && data.phoneOrAccount.size() > 0 &&
+             data.type in ['MOBILE_WALLET', 'BANK_ACCOUNT'] &&
+             (!('bankName' in data) || data.bankName is string) &&
+             (!('branch' in data) || data.branch is string) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    function isValidSupportTicket(data) {
+      return data.ticketId is string &&
+             data.userId is string &&
+             data.category is string && data.category.size() > 0 &&
+             data.message is string && data.message.size() > 0 &&
+             data.status in ['OPEN', 'INVESTIGATING', 'RESOLVED', 'CLOSED'] &&
+             (!('userName' in data) || data.userName is string) &&
+             (!('userPhone' in data) || data.userPhone is string) &&
+             (!('transactionId' in data) || data.transactionId is string) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    function isValidNotification(data) {
+      return data.notificationId is string &&
+             data.userId is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.body is string &&
+             data.type in ['TRANSACTION', 'SECURITY', 'PROMOTION', 'SYSTEM'] &&
+             data.read is bool &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && (request.auth.uid == userId || isAdmin()) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Wallets
+    match /wallets/{walletId} {
+      allow read: if (isAuthenticated() && (walletId == request.auth.uid || resource.data.userId == request.auth.uid)) || isAdmin();
+      allow create: if isAuthenticated() && (walletId == request.auth.uid || request.resource.data.userId == request.auth.uid || isAdmin()) && isValidWallet(request.resource.data);
+      allow update: if (isAuthenticated() && (walletId == request.auth.uid || resource.data.userId == request.auth.uid || isAdmin())) && isValidWallet(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Transactions ledger
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.senderId == request.auth.uid ||
+         resource.data.recipientId == request.auth.uid ||
+         isAdmin());
+      allow create: if isAuthenticated() &&
+        (request.resource.data.senderId == request.auth.uid || isAdmin()) &&
+        isValidTransaction(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if false; // Financial ledger is immutable
+    }
+
+    // Beneficiaries
+    match /beneficiaries/{beneficiaryId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidBeneficiary(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidBeneficiary(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Support Tickets
+    match /supportTickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidSupportTicket(request.resource.data);
+      allow update: if isAdmin() && isValidSupportTicket(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin()) && isValidNotification(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidNotification(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}

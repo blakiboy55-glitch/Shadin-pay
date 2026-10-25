@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered ShadhinPay user profile and security state",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Auth UID of the user" },
+        "fullName": { "type": "string", "description": "Full legal or display name" },
+        "phoneNumber": { "type": "string", "description": "Bangladeshi phone number (+880...)" },
+        "email": { "type": "string", "description": "User email address" },
+        "role": { "type": "string", "enum": ["customer", "merchant", "agent", "admin"], "description": "User role" },
+        "status": { "type": "string", "enum": ["active", "restricted", "suspended"], "description": "Account status" },
+        "kycStatus": { "type": "string", "enum": ["unverified", "pending", "verified"], "description": "National ID / KYC verification status" },
+        "nidNumber": { "type": "string", "description": "National ID number if submitted" },
+        "pinHash": { "type": "string", "description": "Hashed 4-digit transaction PIN" },
+        "biometricsEnabled": { "type": "boolean", "description": "Whether biometric unlock is allowed" },
+        "preferredLanguage": { "type": "string", "enum": ["en", "bn"], "description": "Preferred UI language" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account registration timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Profile modification timestamp" }
+      },
+      "required": ["userId", "fullName", "phoneNumber", "role", "status", "kycStatus", "createdAt", "updatedAt"]
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "User ledger wallet storing BDT balances and transactional limits",
+      "type": "object",
+      "properties": {
+        "walletId": { "type": "string", "description": "Identifier matching userId" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "balance": { "type": "number", "description": "Available ledger balance in BDT" },
+        "pendingBalance": { "type": "number", "description": "Pending incoming/outgoing balance in BDT" },
+        "currency": { "type": "string", "enum": ["BDT"], "description": "Currency code" },
+        "dailyLimit": { "type": "number", "description": "Daily transfer limit in BDT" },
+        "monthlyLimit": { "type": "number", "description": "Monthly transfer limit in BDT" },
+        "spentToday": { "type": "number", "description": "Cumulative transfers executed today in BDT" },
+        "spentThisMonth": { "type": "number", "description": "Cumulative transfers executed this month in BDT" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Wallet update timestamp" }
+      },
+      "required": ["walletId", "userId", "balance", "currency", "dailyLimit", "monthlyLimit", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Auditable financial ledger transaction record",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string", "description": "Unique transaction reference (e.g. TRX-BD8921)" },
+        "idempotencyKey": { "type": "string", "description": "Client idempotency key preventing duplicate transfers" },
+        "senderId": { "type": "string", "description": "Sender user UID or gateway ID" },
+        "senderName": { "type": "string", "description": "Sender display name" },
+        "senderPhone": { "type": "string", "description": "Sender phone number" },
+        "recipientId": { "type": "string", "description": "Recipient UID, merchant code, or agent ID" },
+        "recipientName": { "type": "string", "description": "Recipient display or merchant name" },
+        "recipientPhone": { "type": "string", "description": "Recipient phone or account number" },
+        "type": { "type": "string", "enum": ["SEND_MONEY", "ADD_MONEY", "CASH_OUT", "MOBILE_RECHARGE", "MERCHANT_PAYMENT", "BILL_PAY", "BANK_TRANSFER"], "description": "Transaction category" },
+        "amount": { "type": "number", "description": "Principal amount in BDT" },
+        "fee": { "type": "number", "description": "Calculated transaction fee in BDT" },
+        "totalAmount": { "type": "number", "description": "Total deducted amount including fee in BDT" },
+        "currency": { "type": "string", "enum": ["BDT"], "description": "Currency code" },
+        "status": { "type": "string", "enum": ["SUCCESS", "PENDING", "FAILED", "REVERSED"], "description": "Transaction execution status" },
+        "reference": { "type": "string", "description": "Optional user note or bill account reference" },
+        "metadata": { "type": "string", "description": "Additional provider, biller, or operator metadata" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Execution timestamp" }
+      },
+      "required": ["transactionId", "senderId", "recipientName", "type", "amount", "fee", "totalAmount", "status", "createdAt"]
+    },
+    "Beneficiary": {
+      "title": "Beneficiary",
+      "description": "Saved favorite recipient or bank beneficiary",
+      "type": "object",
+      "properties": {
+        "beneficiaryId": { "type": "string", "description": "Unique ID of beneficiary record" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "name": { "type": "string", "description": "Beneficiary nickname or legal name" },
+        "phoneOrAccount": { "type": "string", "description": "Mobile number or bank account number" },
+        "type": { "type": "string", "enum": ["MOBILE_WALLET", "BANK_ACCOUNT"], "description": "Transfer type" },
+        "bankName": { "type": "string", "description": "Bank name if bank account" },
+        "branch": { "type": "string", "description": "Bank routing branch" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Record creation timestamp" }
+      },
+      "required": ["beneficiaryId", "userId", "name", "phoneOrAccount", "type", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Customer support dispute or enquiry ticket",
+      "type": "object",
+      "properties": {
+        "ticketId": { "type": "string", "description": "Unique support ticket ID" },
+        "userId": { "type": "string", "description": "Reporting user UID" },
+        "userName": { "type": "string", "description": "Customer name" },
+        "userPhone": { "type": "string", "description": "Customer phone" },
+        "category": { "type": "string", "description": "Ticket subject or category" },
+        "message": { "type": "string", "description": "Description of the issue or dispute" },
+        "transactionId": { "type": "string", "description": "Optional related transaction ID" },
+        "status": { "type": "string", "enum": ["OPEN", "INVESTIGATING", "RESOLVED", "CLOSED"], "description": "Ticket status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" }
+      },
+      "required": ["ticketId", "userId", "category", "message", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User in-app alert or receipt notification",
+      "type": "object",
+      "properties": {
+        "notificationId": { "type": "string", "description": "Unique notification ID" },
+        "userId": { "type": "string", "description": "Target user UID" },
+        "title": { "type": "string", "description": "Notification title" },
+        "body": { "type": "string", "description": "Notification body text" },
+        "type": { "type": "string", "enum": ["TRANSACTION", "SECURITY", "PROMOTION", "SYSTEM"], "description": "Notification category" },
+        "read": { "type": "boolean", "description": "Whether read by user" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["notificationId", "userId", "title", "body", "type", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User account documents keyed by Firebase Auth UID"
+    },
+    "/wallets/{walletId}": {
+      "schema": { "$ref": "#/entities/Wallet" },
+      "description": "User wallet ledgers keyed by userId"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Immutable ledger transaction records"
+    },
+    "/beneficiaries/{beneficiaryId}": {
+      "schema": { "$ref": "#/entities/Beneficiary" },
+      "description": "Saved beneficiaries and favorite contacts"
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Customer support and dispute tickets"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User notifications and transaction alerts"
+    }
+  }
+}
